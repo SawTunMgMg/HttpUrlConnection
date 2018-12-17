@@ -1,0 +1,192 @@
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+public class HttpUrlConn
+{
+private static HttpURLConnection httpConn;
+private static final int BUFFER_SIZE = 4096;
+
+public static HttpURLConnection sendGetRequest(String requestURL)
+throws IOException
+{
+URL url = new URL(requestURL);
+httpConn = (HttpURLConnection)url.openConnection();
+httpConn.setUseCaches(false);
+
+httpConn.setDoInput(true);
+httpConn.setDoOutput(false);
+httpConn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/573.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/573.11");
+
+return httpConn;
+}
+
+public static HttpURLConnection sendPostRequest(String requestURL, Map<String, String> params)
+throws IOException
+{
+URL url = new URL(requestURL);
+httpConn = (HttpURLConnection)url.openConnection();
+httpConn.setUseCaches(false);
+
+httpConn.setDoInput(true);
+
+StringBuffer requestParams = new StringBuffer();
+
+if ((params != null) && (params.size() > 0))
+{
+httpConn.setDoOutput(true);
+httpConn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/573.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/573.11");
+
+Iterator paramIterator = params.keySet().iterator();
+while (paramIterator.hasNext()) {
+String key = (String)paramIterator.next();
+String value = (String)params.get(key);
+requestParams.append(URLEncoder.encode(key, "UTF-8"));
+requestParams.append("=").append(
+URLEncoder.encode(value, "UTF-8"));
+requestParams.append("&");
+}
+
+OutputStreamWriter writer = new OutputStreamWriter(
+httpConn.getOutputStream());
+writer.write(requestParams.toString());
+writer.flush();
+}
+
+return httpConn;
+}
+
+public static String readSingleLineRespone()
+throws IOException
+{
+InputStream inputStream = null;
+if (httpConn != null)
+inputStream = httpConn.getInputStream();
+else
+throw new IOException("Connection is not established.");
+
+BufferedReader reader = new BufferedReader(
+new InputStreamReader(inputStream));
+
+String response = reader.readLine();
+reader.close();
+
+return response;
+}
+
+public static String[] readMultipleLinesRespone()
+throws IOException
+{
+InputStream inputStream = null;
+if (httpConn != null)
+inputStream = httpConn.getInputStream();
+else {
+throw new IOException("Connection is not established.");
+}
+
+BufferedReader reader = new BufferedReader(
+new InputStreamReader(inputStream));
+List response = new ArrayList();
+
+String line = "";
+while ((line = reader.readLine()) != null)
+response.add(line);
+
+reader.close();
+
+return ((String[])response.toArray(new String[0]));
+}
+
+public static String[] readErrorStream() throws IOException
+{
+InputStream inputStream = null;
+if (httpConn != null)
+inputStream = httpConn.getErrorStream();
+else {
+throw new IOException("Connection is not established.");
+}
+
+BufferedReader reader = new BufferedReader(
+new InputStreamReader(inputStream));
+List response = new ArrayList();
+
+String line = "";
+while ((line = reader.readLine()) != null)
+response.add(line);
+
+reader.close();
+
+return ((String[])response.toArray(new String[0]));
+}
+
+public static void downloadFile(String fileURL, String saveDir)
+throws IOException
+{
+URL url = new URL(fileURL);
+HttpURLConnection httpConn = (HttpURLConnection)url.openConnection();
+int responseCode = httpConn.getResponseCode();
+
+if (responseCode == 200) {
+String fileName = "";
+String disposition = httpConn.getHeaderField("Content-Disposition");
+String contentType = httpConn.getContentType();
+int contentLength = httpConn.getContentLength();
+
+if (disposition != null)
+{
+int index = disposition.indexOf("filename=");
+if (index > 0)
+fileName = disposition.substring(index + 10, 
+disposition.length() - 1);
+}
+else
+{
+fileName = fileURL.substring(fileURL.lastIndexOf("/") + 1, 
+fileURL.length());
+}
+
+System.out.println("Content-Type = " + contentType);
+System.out.println("Content-Disposition = " + disposition);
+System.out.println("Content-Length = " + contentLength);
+System.out.println("fileName = " + fileName);
+
+InputStream inputStream = httpConn.getInputStream();
+String saveFilePath = saveDir + File.separator + fileName;
+
+FileOutputStream outputStream = new FileOutputStream(saveFilePath);
+
+int bytesRead = -1;
+byte[] buffer = new byte[4096];
+while ((bytesRead = inputStream.read(buffer)) != -1) {
+outputStream.write(buffer, 0, bytesRead);
+}
+
+outputStream.close();
+inputStream.close();
+
+System.out.println("File downloaded");
+} else {
+System.out.println("No file to download. Server replied HTTP code: " + responseCode);
+}
+httpConn.disconnect();
+}
+
+public static void disconnect()
+{
+if (httpConn != null)
+httpConn.disconnect();
+}
+}
